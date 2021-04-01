@@ -24,6 +24,11 @@ using System.Globalization;
 using System.IO;
 using System.Net;
 using System.Net.Sockets;
+using System.Net.Http;
+using System.Threading.Tasks;
+using System.Net.Http.Headers;
+using System.Security.Authentication;
+using System.Text;
 
 namespace Disig.TimeStampClient
 {
@@ -65,6 +70,17 @@ namespace Disig.TimeStampClient
         public static TimeStampToken RequestTimeStampToken(string tsaUri, Stream dataToTimestamp)
         {
             return RequestTimeStampToken(tsaUri, dataToTimestamp, null, null);
+        }
+
+        /// <summary>
+        /// Requests time stamp for the data from stream.
+        /// </summary>
+        /// <param name="tsaUri">URL of a TSA service.</param>
+        /// <param name="dataToTimestamp">Specifies the data to time-stamp.</param>
+        /// <returns>Time-stamp token</returns>
+        public static async Task<TimeStampToken> RequestTimeStampTokenUpdatedAsync(string tsaUri, Stream dataToTimestamp)
+        {
+            return await RequestTimeStampTokenUpdatedAsync(tsaUri, dataToTimestamp, null, null);
         }
 
         /// <summary>
@@ -119,6 +135,36 @@ namespace Disig.TimeStampClient
             byte[] digest = DigestUtils.ComputeDigest(dataToTimestamp, digestType);
             Request request = new Request(digest, digestType.OID);
             return RequestTST(tsaUri, request, credentials);
+        }
+
+        /// <summary>
+        /// Requests time stamp for the data from stream.
+        /// </summary>
+        /// <param name="tsaUri">URL of a TSA service.</param>
+        /// <param name="dataToTimestamp">Specifies the data to time-stamp.</param>
+        /// <param name="digestType">Specifies the hash algorithm to be used to compute digest from data.</param>
+        /// <param name="credentials">User's credentials to access TSA service.</param>
+        /// <returns>Time-stamp token</returns>
+        public static async Task<TimeStampToken> RequestTimeStampTokenUpdatedAsync(string tsaUri, Stream dataToTimestamp, Oid digestType, UserCredentials credentials)
+        {
+            if (null == tsaUri)
+            {
+                throw new ArgumentNullException("tsaUri");
+            }
+
+            if (null == dataToTimestamp)
+            {
+                throw new ArgumentNullException("dataToTimestamp");
+            }
+
+            if (null == digestType)
+            {
+                digestType = Oid.SHA512;
+            }
+
+            byte[] digest = DigestUtils.ComputeDigest(dataToTimestamp, digestType);
+            Request request = new Request(digest, digestType.OID);
+            return await RequestTSTUpdatedAsync(tsaUri, request, credentials);
         }
 
         /// <summary>
@@ -265,6 +311,29 @@ namespace Disig.TimeStampClient
             return response.TST;
         }
 
+        private static async Task<TimeStampToken> RequestTSTUpdatedAsync(string tsaUri, Request request, UserCredentials credentials = null)
+        {
+            byte[] responseBytes = null;
+            UriBuilder urib = new UriBuilder(tsaUri);
+
+            switch (urib.Uri.Scheme)
+            {
+                case "http":
+                case "https":
+                    responseBytes = await GetHttpResponseUpdatedAsync(tsaUri, request.ToByteArray(), credentials);
+                    break;
+                case "tcp":
+                    responseBytes = GetTcpResponse(tsaUri, request.ToByteArray());
+                    break;
+                default:
+                    throw new TimeStampException("Unknown protocol.");
+            }
+
+            Response response = new Response(responseBytes);
+            ValidateResponse(request, response);
+            return response.TST;
+        }
+
         #region Connections
 
         /// <summary>
@@ -384,14 +453,60 @@ namespace Disig.TimeStampClient
             }
         }
 
-        #endregion
-
         /// <summary>
-        /// Validates time stamp response against time stamp request.
+        /// Creates HTTP request and processes HTTP response.
         /// </summary>
-        /// <param name="request">Time-stamp request.</param>
-        /// <param name="response">Time-stamp response.</param>
-        private static void ValidateResponse(Request request, Response response)
+        /// <param name="tsaUri">URL of a TSA service.</param>
+        /// <param name="tsr">DER encoded time stamp request.</param>
+        /// <param name="credentials">User's credentials to access TSA service.</param>
+        /// <returns>DER encoded time stamp response</returns>
+        private static async Task<byte[]> GetHttpResponseUpdatedAsync(string tsaUri, byte[] tsr, UserCredentials credentials = null)
+        {
+            var clientHandler = new HttpClientHandler();// { ClientCertificateOptions = ClientCertificateOption.Manual, SslProtocols = SslProtocols.Tls12, AutomaticDecompression = DecompressionMethods.Deflate | DecompressionMethods.GZip };
+
+            if (null != credentials)
+            {
+                if (null != credentials.UserSslCert)
+                {
+                    clientHandler.ClientCertificates.Add(credentials.UserSslCert);
+                }
+
+                if (null != credentials.HttpCredentials)
+                {
+                    clientHandler.Credentials = credentials.HttpCredentials;
+                }
+            }
+
+            HttpClient httpClient = new HttpClient(clientHandler);              
+
+            ByteArrayContent content = new ByteArrayContent(tsr);
+            content.Headers.Remove("Content-Type");
+            content.Headers.Add("Content-Type", "application/timestamp-query");
+            HttpResponseMessage response = await httpClient.PostAsync(tsaUri, content);
+
+            Stream reqStream = await response.Content.ReadAsStreamAsync();
+
+            byte[] buffer = new byte[16 * 1024];
+            using (MemoryStream ms = new MemoryStream())
+            {
+                int read;
+                while ((read = reqStream.Read(buffer, 0, buffer.Length)) > 0)
+                {
+                    ms.Write(buffer, 0, read);
+                }
+                reqStream.Close();
+                return ms.ToArray();
+            }
+        }
+
+            #endregion
+
+            /// <summary>
+            /// Validates time stamp response against time stamp request.
+            /// </summary>
+            /// <param name="request">Time-stamp request.</param>
+            /// <param name="response">Time-stamp response.</param>
+            private static void ValidateResponse(Request request, Response response)
         {
             if (PkiStatus.Granted == response.PKIStatus || PkiStatus.GrantedWithMods == response.PKIStatus)
             {
