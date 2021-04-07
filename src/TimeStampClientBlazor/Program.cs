@@ -14,6 +14,7 @@ namespace TimeStampClientBlazor
     {
         public static async Task Main(string[] args)
         {
+            System.Text.Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
             var builder = WebAssemblyHostBuilder.CreateDefault(args);
             builder.RootComponents.Add<App>("#app");
 

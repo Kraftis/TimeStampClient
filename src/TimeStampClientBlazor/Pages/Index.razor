@@ -64,36 +64,40 @@
         isLoading = false;
 
         Stream stream = e.File.OpenReadStream();
+        string fileName = e.File.Name;
 
-        byte[] buffer = new byte[16 * 1024];
         MemoryStream ms = new MemoryStream();
+        await stream.CopyToAsync(ms);
 
-        int read;
-        while ((read = await stream.ReadAsync(buffer, 0, buffer.Length)) > 0)
+        var timeStampToken = await Disig.TimeStampClient.TimeStampClient.RequestTimeStampTokenUpdatedAsync("https://localhost:5001/tsa", ms);
+
+        await SaveToAsicSimple(fileName, timeStampToken, ms);
+    }
+
+    async Task DownloadAsics(string fileName, MemoryStream fileInput)
+    {
+        byte[] file = fileInput.ToArray();
+        await JSRuntime.InvokeVoidAsync("BlazorDownloadFile", Path.GetFileNameWithoutExtension(fileName) + ".asics", "application/vnd.etsi.asic-s+zip", file);
+    }
+
+    async Task SaveToAsicSimple(string inputName, Disig.TimeStampClient.TimeStampToken timeStampToken, Stream inputStream)
+    {
+        using (Ionic.Zip.ZipFile zipFile = new Ionic.Zip.ZipFile(UTF8Encoding.UTF8))
         {
-            ms.Write(buffer, 0, read);
+            zipFile.ParallelDeflateThreshold = -1;
+            zipFile.UseZip64WhenSaving = Ionic.Zip.Zip64Option.Never;
+            zipFile.EmitTimesInUnixFormatWhenSaving = false;
+            zipFile.EmitTimesInWindowsFormatWhenSaving = false;
+            zipFile.Comment = @"mimetype=application/vnd.etsi.asic-s+zip";
+
+            using (MemoryStream ms = new MemoryStream())
+            {
+                zipFile.AddEntry(@"mimetype", System.Text.UTF8Encoding.UTF8.GetBytes(@"application/vnd.etsi.asic-s+zip"));
+                zipFile.AddEntry(inputName, inputStream);
+                zipFile.AddEntry(@"META-INF/timestamp.tst", timeStampToken.ToByteArray());
+                zipFile.Save(ms);
+                await DownloadAsics(inputName, ms);
+            }
         }
-
-        var timeStampToken = await Disig.TimeStampClient.TimeStampClient.RequestTimeStampTokenUpdatedAsync("https://localhost:5001/tsr", ms);
-
-        await DownloadText(timeStampToken);
-    }
-
-    async Task DownloadBinary()
-    {
-        // Generate a file
-        byte[] file = Enumerable.Range(0, 100).Cast<byte>().ToArray();
-
-        // Send the data to JS to actually download the file
-        await JSRuntime.InvokeVoidAsync("BlazorDownloadFile", "file.bin", "application/octet-stream", file);
-    }
-
-    async Task DownloadText(Disig.TimeStampClient.TimeStampToken fileInput)
-    {
-        // Generate a text file
-        //byte[] file = System.Text.Encoding.UTF8.GetBytes("Hello world!");
-        byte[] file = fileInput.ToByteArray();
-        await JSRuntime.InvokeVoidAsync("BlazorDownloadFile", "file.asice", @"application/vnd.etsi.asic - e + zip", file);
-        await JSRuntime.InvokeVoidAsync("BlazorDownloadFile", "file.txt", "text/plain", file);
     }
 }

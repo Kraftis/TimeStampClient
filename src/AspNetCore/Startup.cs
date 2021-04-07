@@ -69,9 +69,9 @@ namespace AspNetCore
 
             {
 
-                Scheme = "https",
+                Scheme = "http",
 
-                Host = new Microsoft.AspNetCore.Http.HostString("freetsa.org", 443) //TSA hostname and port
+                Host = new Microsoft.AspNetCore.Http.HostString("tsa-aca.disig.sk", 80) //TSA hostname and port
 
             }));
 
