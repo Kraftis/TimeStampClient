@@ -68,8 +68,9 @@
 
         MemoryStream ms = new MemoryStream();
         await stream.CopyToAsync(ms);
-
+        ms.Position = 0;
         var timeStampToken = await Disig.TimeStampClient.TimeStampClient.RequestTimeStampTokenUpdatedAsync("https://localhost:5001/tsa", ms);
+        stream.Dispose();
 
         await SaveToAsicSimple(fileName, timeStampToken, ms);
     }

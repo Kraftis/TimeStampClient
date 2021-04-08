@@ -13,11 +13,21 @@ namespace TestConsole
 
             string path = @"c:\temp\test.txt";
 
+            //TimeStampToken timeStampTokenUpdated;
+            //using (Stream stream = File.Open(path, System.IO.FileMode.Open, System.IO.FileAccess.Read))
+            //{
+            //    timeStampTokenUpdated = await Disig.TimeStampClient.TimeStampClient.RequestTimeStampTokenUpdatedAsync("https://localhost:5001/tsa", stream);
+            //}
+
+            //// SaveToAsicSimple(path, timeStampTokenUpdated, @"c:\temp\test.asics");
+            //SaveToAsicSimple(path, timeStampTokenUpdated, @".\test.asics");
+
             Stream stream = File.Open(path, System.IO.FileMode.Open, System.IO.FileAccess.Read);
             MemoryStream ms = new MemoryStream();
             await stream.CopyToAsync(ms);
+            ms.Position = 0;
             var timeStampTokenUpdated = await Disig.TimeStampClient.TimeStampClient.RequestTimeStampTokenUpdatedAsync("https://localhost:5001/tsa", ms);
-            stream.Close();
+            stream.Dispose();
 
             SaveToAsicSimple(path, timeStampTokenUpdated, @"c:\temp\test.asics");
 
