@@ -163,7 +163,7 @@ namespace Disig.TimeStampClient
             }
 
             byte[] digest = DigestUtils.ComputeDigest(dataToTimestamp, digestType);
-            Request request = new Request(digest, digestType.OID);
+            Request request = new Request(digest, digestType.OID, certReq: true);
             return await RequestTSTUpdatedAsync(tsaUri, request, credentials);
         }
 
@@ -485,18 +485,11 @@ namespace Disig.TimeStampClient
             HttpResponseMessage response = await httpClient.PostAsync(tsaUri, content);
 
             Stream reqStream = await response.Content.ReadAsStreamAsync();
+            MemoryStream ms = new MemoryStream();
+            reqStream.CopyTo(ms);
+            reqStream.Close();
 
-            byte[] buffer = new byte[16 * 1024];
-            using (MemoryStream ms = new MemoryStream())
-            {
-                int read;
-                while ((read = reqStream.Read(buffer, 0, buffer.Length)) > 0)
-                {
-                    ms.Write(buffer, 0, read);
-                }
-                reqStream.Close();
-                return ms.ToArray();
-            }
+            return ms.ToArray();
         }
 
             #endregion

@@ -33,7 +33,7 @@ namespace Disig.TimeStampClient
         {
             this.TsaCertSerialNumber = signerID.SerialNumber.ToByteArray();
             this.TsaCertSubjectKeyIdentifier = signerID.SubjectKeyIdentifier;
-            this.TsaCertIssuerName = null;// new X500DistinguishedName(signerID.Issuer.GetEncoded());
+            this.TsaCertIssuerName = new X500DistinguishedName(signerID.Issuer.GetEncoded());
 
             if (null != cert)
                 TsaCert = cert;
