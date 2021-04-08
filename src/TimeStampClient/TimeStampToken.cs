@@ -58,14 +58,14 @@ namespace Disig.TimeStampClient
             timeStampToken = new Org.BouncyCastle.Tsp.TimeStampToken(new Org.BouncyCastle.Cms.CmsSignedData(encodedToken));
             this.MessageImprint = new MsgImprint(this.timeStampToken.TimeStampInfo.GetMessageImprintDigest(), this.timeStampToken.TimeStampInfo.MessageImprintAlgOid);
 
-            X509Certificate2 tsaCert = null;
+            Org.BouncyCastle.X509.X509Certificate tsaCert = null;
             Org.BouncyCastle.Cms.SignerID signerId = this.timeStampToken.SignerID;
             Org.BouncyCastle.Cms.CmsSignedData cmsSignedData = new Org.BouncyCastle.Cms.CmsSignedData(this.timeStampToken.GetEncoded());
             ICollection signerCerts = cmsSignedData.GetCertificates("COLLECTION").GetMatches(this.timeStampToken.SignerID);
 
             foreach (Org.BouncyCastle.X509.X509Certificate cert in signerCerts)
             {
-                tsaCert = new X509Certificate2(cert.GetEncoded());
+                tsaCert = cert;
             }
             this.TsaInformation = new TsaId(signerId, tsaCert);
         }

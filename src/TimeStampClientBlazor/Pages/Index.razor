@@ -71,7 +71,7 @@
         ms.Position = 0;
         var timeStampToken = await Disig.TimeStampClient.TimeStampClient.RequestTimeStampTokenUpdatedAsync("https://localhost:5001/tsa", ms);
         stream.Dispose();
-
+        ms.Position = 0;
         await SaveToAsicSimple(fileName, timeStampToken, ms);
     }
 
@@ -97,6 +97,7 @@
                 zipFile.AddEntry(inputName, inputStream);
                 zipFile.AddEntry(@"META-INF/timestamp.tst", timeStampToken.ToByteArray());
                 zipFile.Save(ms);
+                
                 await DownloadAsics(inputName, ms);
             }
         }

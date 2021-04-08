@@ -29,7 +29,7 @@ namespace Disig.TimeStampClient
     /// </summary>
     public class TsaId
     {
-        internal TsaId(SignerID signerID, X509Certificate2 cert)
+        internal TsaId(SignerID signerID, Org.BouncyCastle.X509.X509Certificate cert)
         {
             this.TsaCertSerialNumber = signerID.SerialNumber.ToByteArray();
             this.TsaCertSubjectKeyIdentifier = signerID.SubjectKeyIdentifier;
@@ -69,7 +69,7 @@ namespace Disig.TimeStampClient
         /// <summary>
         /// Signing certificate of a TSA.
         /// </summary>
-        public X509Certificate2 TsaCert
+        public Org.BouncyCastle.X509.X509Certificate TsaCert
         {
             get;
             private set;
