@@ -311,6 +311,13 @@ namespace Disig.TimeStampClient
             return response.TST;
         }
 
+        /// <summary>
+        /// Requests time-stamp from TSA service
+        /// </summary>
+        /// <param name="tsaUri">URL of a TSA service.</param>
+        /// <param name="request">Time-stamp request.</param>
+        /// <param name="credentials">User's credentials to access TSA service.</param>
+        /// <returns>Time-stamp token</returns>
         private static async Task<TimeStampToken> RequestTSTUpdatedAsync(string tsaUri, Request request, UserCredentials credentials = null)
         {
             byte[] responseBytes = null;
@@ -462,7 +469,7 @@ namespace Disig.TimeStampClient
         /// <returns>DER encoded time stamp response</returns>
         private static async Task<byte[]> GetHttpResponseUpdatedAsync(string tsaUri, byte[] tsr, UserCredentials credentials = null)
         {
-            var clientHandler = new HttpClientHandler();// { ClientCertificateOptions = ClientCertificateOption.Manual, SslProtocols = SslProtocols.Tls12, AutomaticDecompression = DecompressionMethods.Deflate | DecompressionMethods.GZip };
+            var clientHandler = new HttpClientHandler();
 
             if (null != credentials)
             {

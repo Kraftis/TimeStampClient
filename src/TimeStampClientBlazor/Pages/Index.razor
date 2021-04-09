@@ -11,6 +11,7 @@
     <label>
         Upload file up to @maxFileSize bytes:
         <InputFile OnChange="@LoadFiles" />
+        <button @onclick="@GenerateFile" disabled="@isDisabled">Generate</button>
     </label>
 </p>
 
@@ -27,34 +28,37 @@
         <li>
             <ul>
                 <li>Name: @file.Name</li>
-                <li>Last modified: @file.LastModified.ToString()</li>
                 <li>Size (bytes): @file.Size</li>
                 <li>Content type: @file.ContentType</li>
-                <li>Content: @content</li>
             </ul>
         </li>
     }
 </ul>
 
 @code {
-    private Dictionary<IBrowserFile, string> loadedFiles =
-        new Dictionary<IBrowserFile, string>();
+    private Dictionary<IBrowserFile, string> loadedFiles = new Dictionary<IBrowserFile, string>();
     private long maxFileSize = 1024 * 1000;
     private bool isLoading;
     string exceptionMessage;
+    Stream stream = null;
+    StreamReader reader = null;
+    string fileName = null;
+    bool isDisabled = true;
 
     async Task LoadFiles(InputFileChangeEventArgs e)
     {
         isLoading = true;
-        loadedFiles.Clear();
+        ClearInfo();
         exceptionMessage = string.Empty;
 
         try
         {
-            using var reader =
-                new StreamReader(e.File.OpenReadStream(maxFileSize));
+            this.reader = new StreamReader(e.File.OpenReadStream(maxFileSize));
+            this.stream = e.File.OpenReadStream(maxFileSize);
+            this.fileName = e.File.Name;
+            isDisabled = false;
 
-            loadedFiles.Add(e.File, await reader.ReadToEndAsync());
+            loadedFiles.Add(e.File, await this.reader.ReadToEndAsync());
         }
         catch (Exception ex)
         {
@@ -62,17 +66,24 @@
         }
 
         isLoading = false;
+    }
 
-        Stream stream = e.File.OpenReadStream();
-        string fileName = e.File.Name;
+    async Task GenerateFile()
+    {
+        if (this.stream != null && !string.IsNullOrEmpty(this.fileName))
+        {
+            MemoryStream ms = new MemoryStream();
+            await this.stream.CopyToAsync(ms);
+            ms.Position = 0;
+            var timeStampToken = await Disig.TimeStampClient.TimeStampClient.RequestTimeStampTokenUpdatedAsync("https://localhost:5001/tsa", ms);
+            stream.Dispose();
+            ms.Position = 0;
 
-        MemoryStream ms = new MemoryStream();
-        await stream.CopyToAsync(ms);
-        ms.Position = 0;
-        var timeStampToken = await Disig.TimeStampClient.TimeStampClient.RequestTimeStampTokenUpdatedAsync("https://localhost:5001/tsa", ms);
-        stream.Dispose();
-        ms.Position = 0;
-        await SaveToAsicSimple(fileName, timeStampToken, ms);
+            await SaveToAsicSimple(this.fileName, timeStampToken, ms);
+        }
+
+        ClearInfo();
+        isDisabled = true;
     }
 
     async Task DownloadAsics(string fileName, MemoryStream fileInput)
@@ -97,9 +108,17 @@
                 zipFile.AddEntry(inputName, inputStream);
                 zipFile.AddEntry(@"META-INF/timestamp.tst", timeStampToken.ToByteArray());
                 zipFile.Save(ms);
-                
+
                 await DownloadAsics(inputName, ms);
             }
         }
+    }
+
+    public void ClearInfo()
+    {
+        this.fileName = null;
+        this.stream = null;
+        this.reader = null;
+        loadedFiles.Clear();
     }
 }
